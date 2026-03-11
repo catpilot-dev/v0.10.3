@@ -9,7 +9,7 @@ NetworkType = log.DeviceState.NetworkType
 
 class Rk3588(HardwareBase):
   def get_device_type(self):
-    return "rk3588"
+    return "pc"  # capnp enum only has tici/pc — use pc until rk3588 is added
 
   def get_os_version(self):
     try:
