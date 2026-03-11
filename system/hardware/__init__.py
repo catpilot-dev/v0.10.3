@@ -2,8 +2,6 @@ import os
 from typing import cast
 
 from openpilot.system.hardware.base import HardwareBase
-from openpilot.system.hardware.tici.hardware import Tici
-from openpilot.system.hardware.pc.hardware import Pc
 
 TICI = os.path.isfile('/TICI')
 AGNOS = os.path.isfile('/AGNOS')
@@ -20,9 +18,11 @@ PC = not TICI and not RK3588
 
 
 if TICI:
+  from openpilot.system.hardware.tici.hardware import Tici
   HARDWARE = cast(HardwareBase, Tici())
 elif RK3588:
   from openpilot.system.hardware.rk3588.hardware import Rk3588
   HARDWARE = cast(HardwareBase, Rk3588())
 else:
+  from openpilot.system.hardware.pc.hardware import Pc
   HARDWARE = cast(HardwareBase, Pc())
