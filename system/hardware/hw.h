@@ -8,6 +8,9 @@
 #if __TICI__
 #include "system/hardware/tici/hardware.h"
 #define Hardware HardwareTici
+#elif __RK3588__
+#include "system/hardware/rk3588/hardware.h"
+#define Hardware HardwareRK3588
 #else
 #include "system/hardware/pc/hardware.h"
 #define Hardware HardwarePC

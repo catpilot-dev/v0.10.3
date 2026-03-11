@@ -4,10 +4,10 @@ import platform
 
 from cereal import car
 from openpilot.common.params import Params
-from openpilot.system.hardware import PC, TICI
+from openpilot.system.hardware import PC, TICI, RK3588
 from openpilot.system.manager.process import PythonProcess, NativeProcess, DaemonProcess
 
-WEBCAM = os.getenv("USE_WEBCAM") is not None
+WEBCAM = os.getenv("USE_WEBCAM") is not None or RK3588
 
 def driverview(started: bool, params: Params, CP: car.CarParams) -> bool:
   return started or params.get_bool("IsDriverViewEnabled")

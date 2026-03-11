@@ -32,11 +32,16 @@ if platform.system() == "Darwin":
   brew_prefix = subprocess.check_output(['brew', '--prefix'], encoding='utf8').strip()
 elif arch == "aarch64" and os.path.isfile('/TICI'):
   arch = "larch64"
+elif arch == "aarch64" and os.path.exists('/proc/device-tree/model'):
+  with open('/proc/device-tree/model') as f:
+    if 'RK3588' in f.read().upper():
+      arch = "rk3588"
 assert arch in [
   "larch64",  # linux tici arm64
   "aarch64",  # linux pc arm64
   "x86_64",   # linux pc x64
   "Darwin",   # macOS arm64 (x86 not supported)
+  "rk3588",   # linux rk3588 arm64 (Orange Pi 5 Plus)
 ]
 
 env = Environment(
@@ -102,6 +107,14 @@ if arch == "larch64":
     "/usr/lib/aarch64-linux-gnu",
   ])
   arch_flags = ["-D__TICI__", "-mcpu=cortex-a57"]
+  env.Append(CCFLAGS=arch_flags)
+  env.Append(CXXFLAGS=arch_flags)
+elif arch == "rk3588":
+  env.Append(LIBPATH=[
+    "/usr/local/lib",
+    "/usr/lib/aarch64-linux-gnu",
+  ])
+  arch_flags = ["-D__RK3588__", "-mcpu=cortex-a76"]
   env.Append(CCFLAGS=arch_flags)
   env.Append(CXXFLAGS=arch_flags)
 elif arch == "Darwin":
