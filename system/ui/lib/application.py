@@ -41,6 +41,7 @@ PROFILE_STATS = int(os.getenv("PROFILE_STATS", "100"))  # Number of functions to
 RECORD = os.getenv("RECORD") == "1"
 RECORD_HLS = os.getenv("RECORD_HLS") == "1"
 RECORD_OUTPUT = os.getenv("RECORD_OUTPUT", "output.mp4")
+RECORD_SKIP = int(os.getenv("RECORD_SKIP", "0"))  # Skip N frames between captures (0=capture every frame)
 if not RECORD_HLS:
   RECORD_OUTPUT = str(Path(RECORD_OUTPUT).with_suffix(".mp4"))
 
@@ -281,6 +282,8 @@ class GuiApplication:
         rl.set_texture_filter(self._render_texture.texture, rl.TextureFilter.TEXTURE_FILTER_BILINEAR)
 
       if RECORD:
+        # Effective capture rate accounts for frame skipping
+        capture_fps = fps / (RECORD_SKIP + 1) if RECORD_SKIP > 0 else fps
         ffmpeg_args = [
           'ffmpeg',
           '-v', 'warning',          # Reduce ffmpeg log spam
@@ -288,7 +291,7 @@ class GuiApplication:
           '-f', 'rawvideo',         # Input format
           '-pix_fmt', 'rgba',       # Input pixel format
           '-s', f'{self._width}x{self._height}',  # Input resolution
-          '-r', str(fps),           # Input frame rate
+          '-r', str(capture_fps),   # Input frame rate (effective after skip)
           '-i', 'pipe:0',           # Input from stdin
           '-vf', 'vflip,format=yuv420p',  # Flip vertically and convert rgba to yuv420p
           '-c:v', 'libx264',        # Video codec
@@ -299,10 +302,11 @@ class GuiApplication:
           hls_time = os.getenv("RECORD_HLS_TIME", "2")
           hls_list_size = os.getenv("RECORD_HLS_LIST_SIZE", "10")
           ffmpeg_args += [
+            '-g', str(max(1, int(capture_fps))),  # Keyframe interval for HLS segmenting
             '-f', 'hls',
             '-hls_time', hls_time,
             '-hls_list_size', hls_list_size,
-            '-hls_flags', 'delete_segments',
+            '-hls_flags', 'delete_segments+append_list',
             RECORD_OUTPUT,
           ]
         else:
@@ -542,12 +546,13 @@ class GuiApplication:
         rl.end_drawing()
 
         if RECORD:
-          image = rl.load_image_from_texture(self._render_texture.texture)
-          data_size = image.width * image.height * 4
-          data = bytes(rl.ffi.buffer(image.data, data_size))
-          self._ffmpeg_proc.stdin.write(data)
-          self._ffmpeg_proc.stdin.flush()
-          rl.unload_image(image)
+          if RECORD_SKIP <= 0 or self._frame % (RECORD_SKIP + 1) == 0:
+            image = rl.load_image_from_texture(self._render_texture.texture)
+            data_size = image.width * image.height * 4
+            data = bytes(rl.ffi.buffer(image.data, data_size))
+            self._ffmpeg_proc.stdin.write(data)
+            self._ffmpeg_proc.stdin.flush()
+            rl.unload_image(image)
 
         self._monitor_fps()
         self._frame += 1
