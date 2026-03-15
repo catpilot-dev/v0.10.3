@@ -44,6 +44,7 @@ RECORD_OUTPUT = os.getenv("RECORD_OUTPUT", "output.mp4")
 RECORD_SKIP = int(os.getenv("RECORD_SKIP", "0"))  # Skip N frames between captures (0=capture every frame)
 RECORD_CODEC = os.getenv("RECORD_CODEC", "libx264")  # Video codec (libx264, h264_v4l2m2m, etc.)
 RECORD_FRAG_MP4 = os.getenv("RECORD_FRAG_MP4") == "1"  # Fragmented MP4 output (for streaming)
+RECORD_VF = os.getenv("RECORD_VF", "")  # Extra video filters (e.g. "scale=1080:540" for downscale)
 if not RECORD_HLS:
   RECORD_OUTPUT = str(Path(RECORD_OUTPUT).with_suffix(".mp4"))
 
@@ -295,7 +296,7 @@ class GuiApplication:
           '-s', f'{self._width}x{self._height}',  # Input resolution
           '-r', str(capture_fps),   # Input frame rate (effective after skip)
           '-i', 'pipe:0',           # Input from stdin
-          '-vf', 'vflip,format=yuv420p',  # Flip vertically and convert rgba to yuv420p
+          '-vf', f'vflip,{RECORD_VF + "," if RECORD_VF else ""}format=yuv420p',
           '-c:v', RECORD_CODEC,     # Video codec (libx264, h264_v4l2m2m, etc.)
         ]
         if RECORD_CODEC == 'libx264':
