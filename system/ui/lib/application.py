@@ -42,6 +42,8 @@ RECORD = os.getenv("RECORD") == "1"
 RECORD_HLS = os.getenv("RECORD_HLS") == "1"
 RECORD_OUTPUT = os.getenv("RECORD_OUTPUT", "output.mp4")
 RECORD_SKIP = int(os.getenv("RECORD_SKIP", "0"))  # Skip N frames between captures (0=capture every frame)
+RECORD_CODEC = os.getenv("RECORD_CODEC", "libx264")  # Video codec (libx264, h264_v4l2m2m, etc.)
+RECORD_FRAG_MP4 = os.getenv("RECORD_FRAG_MP4") == "1"  # Fragmented MP4 output (for streaming)
 if not RECORD_HLS:
   RECORD_OUTPUT = str(Path(RECORD_OUTPUT).with_suffix(".mp4"))
 
@@ -294,10 +296,12 @@ class GuiApplication:
           '-r', str(capture_fps),   # Input frame rate (effective after skip)
           '-i', 'pipe:0',           # Input from stdin
           '-vf', 'vflip,format=yuv420p',  # Flip vertically and convert rgba to yuv420p
-          '-c:v', 'libx264',        # Video codec
-          '-preset', 'ultrafast',   # Encoding speed
-          '-y',                     # Overwrite existing file
+          '-c:v', RECORD_CODEC,     # Video codec (libx264, h264_v4l2m2m, etc.)
         ]
+        if RECORD_CODEC == 'libx264':
+          ffmpeg_args += ['-preset', 'ultrafast']
+        ffmpeg_args += ['-y']       # Overwrite existing file
+
         if RECORD_HLS:
           hls_time = os.getenv("RECORD_HLS_TIME", "2")
           hls_list_size = os.getenv("RECORD_HLS_LIST_SIZE", "10")
@@ -307,6 +311,13 @@ class GuiApplication:
             '-hls_time', hls_time,
             '-hls_list_size', hls_list_size,
             '-hls_flags', 'delete_segments+append_list',
+            RECORD_OUTPUT,
+          ]
+        elif RECORD_FRAG_MP4:
+          ffmpeg_args += [
+            '-g', str(max(1, int(capture_fps))),
+            '-f', 'mp4',
+            '-movflags', 'frag_keyframe+empty_moov+default_base_moof',
             RECORD_OUTPUT,
           ]
         else:
