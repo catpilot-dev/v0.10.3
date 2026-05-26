@@ -110,7 +110,8 @@ def migrate_longitudinalPlan(msgs):
     if msg.which() != 'longitudinalPlan':
       continue
     new_msg = msg.as_builder()
-    a_target, should_stop = get_accel_from_plan(msg.longitudinalPlan.speeds, msg.longitudinalPlan.accels, CONTROL_N_T_IDX)
+    v_target, a_target, should_stop = get_accel_from_plan(msg.longitudinalPlan.speeds, msg.longitudinalPlan.accels, CONTROL_N_T_IDX)
+    new_msg.longitudinalPlan.vTarget = float(v_target)
     new_msg.longitudinalPlan.aTarget, new_msg.longitudinalPlan.shouldStop = float(a_target), bool(should_stop)
     ops.append((index, new_msg.as_reader()))
   return ops, [], []
