@@ -17,7 +17,9 @@ from openpilot.selfdrive.controls.lib.latcontrol_pid import LatControlPID
 from openpilot.selfdrive.controls.lib.latcontrol_angle import LatControlAngle, STEER_ANGLE_SATURATION_THRESHOLD
 from openpilot.selfdrive.controls.lib.latcontrol_torque import LatControlTorque
 from openpilot.selfdrive.controls.lib.longcontrol import LongControl
-from openpilot.selfdrive.modeld.modeld import LAT_SMOOTH_SECONDS
+from openpilot.selfdrive.modeld.constants import ModelConstants
+LAT_SMOOTH_SECONDS = ModelConstants.LAT_SMOOTH_SECONDS
+from openpilot.selfdrive.plugins.hooks import hooks
 from openpilot.selfdrive.locationd.helpers import PoseCalibrator, Pose
 
 State = log.SelfdriveState.OpenpilotState
@@ -57,6 +59,8 @@ class Controls:
       self.LaC = LatControlPID(self.CP, self.CI, DT_CTRL)
     elif self.CP.lateralTuning.which() == 'torque':
       self.LaC = LatControlTorque(self.CP, self.CI, DT_CTRL)
+
+    hooks.run('controls.lat_controller_init', None, self.LaC, self.CP)
 
   def update(self):
     self.sm.update(15)
@@ -117,8 +121,11 @@ class Controls:
     # Steering PID loop and lateral MPC
     # Reset desired curvature to current to avoid violating the limits on engage
     new_desired_curvature = model_v2.action.desiredCurvature if CC.latActive else self.curvature
-    self.desired_curvature, curvature_limited = clip_curvature(CS.vEgo, self.desired_curvature, new_desired_curvature, lp.roll)
+    # Plugin hook: allow plugins to adjust curvature (e.g. lane centering, look ahead)
+    lane_changing = model_v2.meta.laneChangeState != LaneChangeState.off
     lat_delay = self.sm["liveDelay"].lateralDelay + LAT_SMOOTH_SECONDS
+    new_desired_curvature = hooks.run('controls.curvature_correction', new_desired_curvature, model_v2, CS.vEgo, lane_changing, lat_delay=lat_delay)
+    self.desired_curvature, curvature_limited = clip_curvature(CS.vEgo, self.desired_curvature, new_desired_curvature, lp.roll)
 
     actuators.curvature = self.desired_curvature
     steer, steeringAngleDeg, lac_log = self.LaC.update(CC.latActive, CS, self.VM, lp,
@@ -135,6 +142,9 @@ class Controls:
       if not math.isfinite(attr):
         cloudlog.error(f"actuators.{p} not finite {actuators.to_dict()}")
         setattr(actuators, p, 0.0)
+
+    # Plugin hook: post-process actuators (e.g. BMW DCC vTarget override)
+    hooks.run('controls.post_actuators', None, actuators, CS, long_plan)
 
     return CC, lac_log
 
